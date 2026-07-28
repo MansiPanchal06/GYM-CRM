@@ -21,6 +21,28 @@ export interface Client {
   status: string
   goal: string
   attendance: number
+  // Extended fields
+  address?: string
+  notes?: string
+  membershipAmount?: number
+}
+
+export interface AttendanceLog {
+  id: number
+  clientId: number
+  date: string        // ISO date string "YYYY-MM-DD"
+  checkInTime: string // e.g. "08:30 AM"
+  checkOutTime?: string
+  present: boolean
+}
+
+export interface SavedWorkout {
+  id: number
+  name: string
+  focus: string
+  exercises: string[]
+  duration: string
+  intensity: string
 }
 
 export interface DailyUpdate {
@@ -86,6 +108,11 @@ interface DataContextType {
   clearNotifications: () => void
   chatMessages: ChatMessage[]
   addChatMessage: (msg: Omit<ChatMessage, 'id' | 'timestamp' | 'time'>) => void
+  attendanceLogs: AttendanceLog[]
+  addAttendanceLog: (log: Omit<AttendanceLog, 'id'>) => void
+  savedWorkouts: SavedWorkout[]
+  addSavedWorkout: (workout: Omit<SavedWorkout, 'id'>) => void
+  deleteSavedWorkout: (id: number) => void
 }
 
 const DataContext = createContext<DataContextType | null>(null)
@@ -103,6 +130,34 @@ const avatarColors = [
   'from-cyan-500 to-sky-600',
 ]
 
+// Generate mock attendance logs for all clients
+function generateMockAttendanceLogs(): AttendanceLog[] {
+  const clientIds = [1,2,3,4,5,6,7,8]
+  const logs: AttendanceLog[] = []
+  let id = 1
+  const checkInTimes = ['06:15 AM','06:45 AM','07:00 AM','07:30 AM','08:00 AM','08:15 AM','08:45 AM','09:00 AM','09:30 AM','10:00 AM']
+  const checkOutTimes = ['07:15 AM','07:45 AM','08:15 AM','08:30 AM','09:00 AM','09:30 AM','10:00 AM','10:30 AM','11:00 AM','11:30 AM']
+  for (const clientId of clientIds) {
+    for (let d = 0; d < 30; d++) {
+      const date = new Date()
+      date.setDate(date.getDate() - d)
+      const dow = date.getDay()
+      const isWeekend = dow === 0 || dow === 6
+      const present = !isWeekend && Math.random() > 0.25
+      const ciIdx = Math.floor(Math.random() * checkInTimes.length)
+      logs.push({
+        id: id++,
+        clientId,
+        date: date.toISOString().split('T')[0],
+        checkInTime: present ? checkInTimes[ciIdx] : '',
+        checkOutTime: present ? checkOutTimes[ciIdx] : undefined,
+        present,
+      })
+    }
+  }
+  return logs
+}
+
 export function DataProvider({ children }: { children: ReactNode }) {
   const [clients, setClients] = useState<Client[]>([])
   const [dailyUpdates, setDailyUpdates] = useState<DailyUpdate[]>([])
@@ -110,6 +165,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [weightTableData, setWeightTableData] = useState<WeightTableEntry[]>([])
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [attendanceLogs] = useState<AttendanceLog[]>(generateMockAttendanceLogs)
+  const [savedWorkouts, setSavedWorkouts] = useState<SavedWorkout[]>([
+    { id: 1, name: 'Full Body Blast', focus: 'Full Body', exercises: ['Push-ups 3×15','Squats 3×20','Pull-ups 3×10','Plank 3×1min'], duration: '45 min', intensity: 'High' },
+    { id: 2, name: 'Core Crusher', focus: 'Core', exercises: ['Crunches 4×20','Russian Twists 3×20','Leg Raises 4×15','Plank 4×1min'], duration: '30 min', intensity: 'Medium' },
+    { id: 3, name: 'HIIT Cardio', focus: 'Cardio', exercises: ['Jump Rope 5min','Burpees 3×15','Mountain Climbers 3×1min','Box Jumps 3×10'], duration: '35 min', intensity: 'Very High' },
+  ])
+  const nextWorkoutIdRef = { current: 4 }
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
   useEffect(() => {
@@ -300,6 +362,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Attendance logs (client-side only)
+  const addAttendanceLog = (log: Omit<AttendanceLog, 'id'>) => {
+    console.log('Attendance log added (mock):', log)
+  }
+
+  // Saved workouts (client-side only)
+  const addSavedWorkout = (workout: Omit<SavedWorkout, 'id'>) => {
+    const id = nextWorkoutIdRef.current++
+    setSavedWorkouts(prev => [...prev, { ...workout, id }])
+  }
+
+  const deleteSavedWorkout = (id: number) => {
+    setSavedWorkouts(prev => prev.filter(w => w.id !== id))
+  }
+
   return (
     <DataContext.Provider value={{
       clients, addClient, updateClient, deleteClient,
@@ -308,6 +385,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       weightTableData, addWeightTableEntry,
       notifications, addNotification, markNotificationRead, clearNotifications,
       chatMessages, addChatMessage,
+      attendanceLogs, addAttendanceLog,
+      savedWorkouts, addSavedWorkout, deleteSavedWorkout,
     }}>
       {children}
     </DataContext.Provider>

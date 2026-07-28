@@ -43,14 +43,22 @@ export default function Clients() {
   // Message state
   const [messageText, setMessageText] = useState('')
 
-  const filters = ['All', 'Active', 'Expiring', 'Expired']
+  // Extended form states
+  const [address, setAddress] = useState('')
+  const [notes, setNotes] = useState('')
+  const [membershipAmount, setMembershipAmount] = useState('')
+
+  const filters = ['All Members', 'Active Members', 'Inactive Members', 'Near Expiry Members']
 
   const filtered = clients.filter(c => {
     const matchSearch =
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.phone.includes(search) ||
       c.plan.toLowerCase().includes(search.toLowerCase())
-    const matchFilter = filter === 'All' || c.status === filter
+    let matchFilter = true
+    if (filter === 'Active Members') matchFilter = c.status === 'Active'
+    else if (filter === 'Inactive Members') matchFilter = c.status === 'Expired'
+    else if (filter === 'Near Expiry Members') matchFilter = c.status === 'Expiring' || c.remainingDays <= 30
     return matchSearch && matchFilter
   })
 
@@ -80,6 +88,9 @@ export default function Clients() {
     setHeight('170')
     setGoal('Weight Loss')
     setStatus('Active')
+    setAddress('')
+    setNotes('')
+    setMembershipAmount('5000')
     setShowAddModal(true)
   }
 
@@ -109,7 +120,10 @@ export default function Clients() {
       height: Number(height),
       status,
       goal,
-      attendance: 100
+      attendance: 100,
+      address,
+      notes,
+      membershipAmount: Number(membershipAmount) || 0
     })
 
 
@@ -130,6 +144,9 @@ export default function Clients() {
     setHeight(String(selectedClient.height))
     setGoal(selectedClient.goal)
     setStatus(selectedClient.status)
+    setAddress(selectedClient.address || '')
+    setNotes(selectedClient.notes || '')
+    setMembershipAmount(selectedClient.membershipAmount ? String(selectedClient.membershipAmount) : '5000')
     setShowEditModal(true)
   }
 
@@ -155,7 +172,10 @@ export default function Clients() {
       goalWeight: Number(goalWeight),
       height: Number(height),
       status,
-      goal
+      goal,
+      address,
+      notes,
+      membershipAmount: Number(membershipAmount) || 0
     })
 
     setShowEditModal(false)
@@ -519,6 +539,18 @@ export default function Clients() {
                     <option value="Expired">Expired</option>
                   </select>
                 </div>
+                <div>
+                  <label className="section-label">Membership Amount (₹)</label>
+                  <input className="input-glass w-full" type="number" value={membershipAmount} onChange={e => setMembershipAmount(e.target.value)} placeholder="5000" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="section-label">Address</label>
+                  <input className="input-glass w-full" value={address} onChange={e => setAddress(e.target.value)} placeholder="Street address, City" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="section-label">Comments / Notes</label>
+                  <textarea className="input-glass w-full" rows={3} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Medical conditions, preferences, internal notes..." />
+                </div>
               </div>
 
               <button className="btn-primary w-full justify-center" style={{ marginTop: '12px', padding: '12px' }} type="submit">
@@ -605,6 +637,18 @@ export default function Clients() {
                     <option value="Expiring">Expiring</option>
                     <option value="Expired">Expired</option>
                   </select>
+                </div>
+                <div>
+                  <label className="section-label">Membership Amount (₹)</label>
+                  <input className="input-glass w-full" type="number" value={membershipAmount} onChange={e => setMembershipAmount(e.target.value)} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="section-label">Address</label>
+                  <input className="input-glass w-full" value={address} onChange={e => setAddress(e.target.value)} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="section-label">Comments / Notes</label>
+                  <textarea className="input-glass w-full" rows={3} value={notes} onChange={e => setNotes(e.target.value)} />
                 </div>
               </div>
 

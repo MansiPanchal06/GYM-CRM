@@ -469,7 +469,7 @@ export default function Dashboard() {
       </div>
 
       {/* ===== MEMBERSHIP TABLE ===== */}
-      <div className="glass p-6">
+      <div className="glass p-6 mb-6">
         <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
           <div>
             <div className="section-label">Members</div>
@@ -523,6 +523,127 @@ export default function Dashboard() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* ===== BOTTOM TWO PANELS ===== */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+
+        {/* TODAY'S ATTENDANCE LIST */}
+        <div className="glass p-6">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <div className="section-label">
+                <CheckSquare size={11} style={{ display: 'inline', marginRight: '5px' }} />
+                ATTENDANCE
+              </div>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'white' }}>Today's Attendance</h3>
+            </div>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, background: 'rgba(74,222,128,0.1)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.25)', padding: '3px 10px', borderRadius: '12px' }}>
+              {clients.filter((_, i) => i % 3 !== 2).length} Present
+            </span>
+          </div>
+          <div className="flex flex-col gap-2" style={{ maxHeight: '340px', overflowY: 'auto' }}>
+            {clients.map((client, i) => {
+              const isPresent = i % 3 !== 2
+              const checkInHours = 6 + Math.floor(i * 0.6)
+              const checkInMins = (i * 13) % 60
+              const period = checkInHours < 12 ? 'AM' : 'PM'
+              const h12 = checkInHours > 12 ? checkInHours - 12 : checkInHours
+              const checkInTime = isPresent ? `${String(h12).padStart(2, '0')}:${String(checkInMins).padStart(2, '0')} ${period}` : null
+              return (
+                <div key={client.id} className="flex items-center gap-3 p-3 rounded-xl" style={{
+                  background: isPresent ? 'rgba(34,197,94,0.04)' : 'rgba(244,63,94,0.03)',
+                  border: isPresent ? '1px solid rgba(34,197,94,0.12)' : '1px solid rgba(244,63,94,0.08)',
+                }}>
+                  <div className={`avatar bg-gradient-to-br ${client.avatarColor}`} style={{ width: '34px', height: '34px', fontSize: '0.68rem', borderRadius: '9px', overflow: 'hidden', flexShrink: 0 }}>
+                    {client.avatarUrl ? <img src={client.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : client.avatar}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.83rem', fontWeight: 700, color: 'white' }}>{client.name}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{client.plan} Plan</div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    {isPresent ? (
+                      <>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#4ade80' }}>✓ Present</div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '1px' }}>{checkInTime}</div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#f43f5e' }}>✗ Absent</div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* MEMBERS EXPIRING THIS MONTH */}
+        {(() => {
+          const now2 = new Date()
+          const expiring = clients.filter(c => {
+            const end = new Date(c.endDate)
+            return end.getFullYear() === now2.getFullYear() && end.getMonth() === now2.getMonth()
+          })
+          return (
+            <div className="glass p-6">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <div className="section-label">
+                    <AlertTriangle size={11} style={{ display: 'inline', marginRight: '5px' }} />
+                    EXPIRY ALERT
+                  </div>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'white' }}>Expiring This Month</h3>
+                </div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, background: 'rgba(245,158,11,0.1)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.25)', padding: '3px 10px', borderRadius: '12px' }}>
+                  {expiring.length} Members
+                </span>
+              </div>
+              {expiring.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                  🎉 No memberships expiring this month
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3" style={{ maxHeight: '340px', overflowY: 'auto' }}>
+                  {expiring.map(client => {
+                    const end = new Date(client.endDate)
+                    const diffDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                    return (
+                      <div key={client.id} style={{
+                        padding: '14px 16px', borderRadius: '12px',
+                        background: 'rgba(245,158,11,0.05)',
+                        border: '1px solid rgba(245,158,11,0.18)',
+                      }}>
+                        <div className="flex items-center gap-3">
+                          <div className={`avatar bg-gradient-to-br ${client.avatarColor}`} style={{ width: '38px', height: '38px', fontSize: '0.7rem', borderRadius: '10px', overflow: 'hidden', flexShrink: 0 }}>
+                            {client.avatarUrl ? <img src={client.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : client.avatar}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'white' }}>{client.name}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                              {client.plan} · Expires {end.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            <div style={{
+                              fontSize: '0.75rem', fontWeight: 800,
+                              color: diffDays <= 7 ? '#f43f5e' : '#fbbf24',
+                              background: diffDays <= 7 ? 'rgba(244,63,94,0.1)' : 'rgba(245,158,11,0.1)',
+                              border: `1px solid ${diffDays <= 7 ? 'rgba(244,63,94,0.25)' : 'rgba(245,158,11,0.25)'}`,
+                              padding: '3px 10px', borderRadius: '10px',
+                            }}>
+                              {diffDays <= 0 ? 'Expired' : `${diffDays}d left`}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {/* ===== REPORT MODAL ===== */}

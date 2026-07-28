@@ -8,6 +8,8 @@ import WorkoutSchedules from './pages/WorkoutSchedules'
 import DailyUpdates from './pages/DailyUpdates'
 import WeightManagement from './pages/WeightManagement'
 import MemberPortal from './pages/MemberPortal'
+import MemberDashboard from './pages/MemberDashboard'
+import MemberActivity from './pages/MemberActivity'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -27,6 +29,8 @@ function App() {
       <Route path="/daily-updates" element={<ProtectedRoute><Layout><DailyUpdates /></Layout></ProtectedRoute>} />
       <Route path="/weight" element={<ProtectedRoute><Layout><WeightManagement /></Layout></ProtectedRoute>} />
       <Route path="/member" element={<ProtectedRoute><Layout><MemberPortal /></Layout></ProtectedRoute>} />
+      <Route path="/member-dashboard" element={<ProtectedRoute><Layout><MemberDashboard /></Layout></ProtectedRoute>} />
+      <Route path="/member-activity" element={<ProtectedRoute><Layout><MemberActivity /></Layout></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

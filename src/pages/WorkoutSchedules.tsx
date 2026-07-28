@@ -1,6 +1,5 @@
-// PAGE 4 - WORKOUT SCHEDULING (Premium Dark Fitness Theme)
 import { useState } from 'react'
-import { Plus, Edit2, Clock, Flame, ChevronDown, ChevronUp, Calendar, X } from 'lucide-react'
+import { Plus, Edit2, Clock, Flame, ChevronDown, ChevronUp, Calendar, X, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { workoutSchedule as initialWorkoutSchedule } from '../data/mockData'
@@ -26,13 +25,14 @@ interface WorkoutDay {
 
 export default function WorkoutSchedules() {
   const { user } = useAuth()
-  const { clients, addNotification } = useData()
+  const { clients, addNotification, savedWorkouts, addSavedWorkout, deleteSavedWorkout } = useData()
   const [schedules, setSchedules] = useState<WorkoutDay[]>(initialWorkoutSchedule)
   const [expanded, setExpanded] = useState<string | null>('Tuesday')
 
   // Modals state
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   // Edit form states
   const [editingDay, setEditingDay] = useState<WorkoutDay | null>(null)
@@ -41,9 +41,18 @@ export default function WorkoutSchedules() {
   const [editIntensity, setEditIntensity] = useState('Medium')
   const [editExercises, setEditExercises] = useState('')
 
+  // Create Custom Workout form states
+  const [createName, setCreateName] = useState('')
+  const [createFocus, setCreateFocus] = useState('')
+  const [createDuration, setCreateDuration] = useState('45 min')
+  const [createIntensity, setCreateIntensity] = useState('High')
+  const [createExercises, setCreateExercises] = useState('')
+
   // Assign form states
   const [selectedClientId, setSelectedClientId] = useState('')
+  const [assignSource, setAssignSource] = useState<'schedule' | 'saved'>('schedule')
   const [selectedDay, setSelectedDay] = useState('Monday')
+  const [selectedSavedId, setSelectedSavedId] = useState<number>(1)
 
   const handleOpenEdit = (dayObj: WorkoutDay) => {
     setEditingDay(dayObj)
@@ -76,11 +85,34 @@ export default function WorkoutSchedules() {
     setShowEditModal(false)
   }
 
-  const handleOpenAssign = (dayName?: string) => {
+  const handleCreateSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!createName || !createFocus || !createExercises) return
+
+    addSavedWorkout({
+      name: createName,
+      focus: createFocus,
+      duration: createDuration,
+      intensity: createIntensity,
+      exercises: createExercises.split('\n').filter(ex => ex.trim() !== '')
+    })
+
+    addNotification(`Created new custom workout "${createName}"`, 'success')
+    setCreateName('')
+    setCreateFocus('')
+    setCreateExercises('')
+    setShowCreateModal(false)
+  }
+
+  const handleOpenAssign = (dayName?: string, savedId?: number) => {
     if (clients.length > 0) {
       setSelectedClientId(String(clients[0].id))
     }
-    if (dayName) {
+    if (savedId) {
+      setAssignSource('saved')
+      setSelectedSavedId(savedId)
+    } else if (dayName) {
+      setAssignSource('schedule')
       setSelectedDay(dayName)
     }
     setShowAssignModal(true)
@@ -89,11 +121,21 @@ export default function WorkoutSchedules() {
   const handleAssignSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const client = clients.find(c => String(c.id) === selectedClientId)
-    const dayObj = schedules.find(s => s.day === selectedDay)
 
-    if (client && dayObj) {
-      addNotification(`Assigned "${dayObj.focus}" workout to ${client.name} for ${selectedDay}`, 'success')
-      alert(`Successfully assigned ${selectedDay}'s workout (${dayObj.focus}) to ${client.name}!`)
+    if (!client) return
+
+    if (assignSource === 'schedule') {
+      const dayObj = schedules.find(s => s.day === selectedDay)
+      if (dayObj) {
+        addNotification(`Assigned "${dayObj.focus}" workout to ${client.name} for ${selectedDay}`, 'success')
+        alert(`Successfully assigned ${selectedDay}'s workout (${dayObj.focus}) to ${client.name}!`)
+      }
+    } else {
+      const savedObj = savedWorkouts.find(w => w.id === Number(selectedSavedId))
+      if (savedObj) {
+        addNotification(`Assigned custom workout "${savedObj.name}" to ${client.name}`, 'success')
+        alert(`Successfully assigned "${savedObj.name}" workout to ${client.name}!`)
+      }
     }
     setShowAssignModal(false)
   }
@@ -115,7 +157,10 @@ export default function WorkoutSchedules() {
           </p>
         </div>
         {user?.role === 'admin' && (
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
+            <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
+              <Plus size={15} /> Create Workout
+            </button>
             <button className="btn-secondary" onClick={() => handleOpenAssign()}>
               Assign Workout
             </button>
@@ -238,7 +283,7 @@ export default function WorkoutSchedules() {
       </div>
 
       {/* Summary Bar */}
-      <div className="glass p-6">
+      <div className="glass p-6 mb-8">
         <div className="flex items-center gap-2 mb-5">
           <div className="section-label" style={{ marginBottom: 0 }}>Weekly Summary</div>
         </div>
@@ -256,6 +301,62 @@ export default function WorkoutSchedules() {
             }}>
               <div style={{ fontSize: '1.6rem', fontWeight: 900, color: s.color, marginBottom: '4px', letterSpacing: '-0.02em' }}>{s.value}</div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ===== SAVED CUSTOM WORKOUTS LIBRARY ===== */}
+      <div className="glass p-6 mb-8">
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+          <div>
+            <div className="section-label">WORKOUT LIBRARY</div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'white' }}>Custom Workouts</h3>
+          </div>
+          {user?.role === 'admin' && (
+            <button className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.8rem' }} onClick={() => setShowCreateModal(true)}>
+              <Plus size={14} /> New Custom Workout
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {savedWorkouts.map(w => (
+            <div key={w.id} style={{
+              padding: '18px', borderRadius: '14px',
+              background: 'rgba(255,255,255,0.02)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+            }}>
+              <div>
+                <div className="flex items-start justify-between mb-2">
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: 'white' }}>{w.name}</div>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: 'rgba(250,204,21,0.1)', color: '#FACC15', border: '1px solid rgba(250,204,21,0.2)' }}>
+                    {w.focus}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted mb-3" style={{ color: 'var(--text-muted)' }}>
+                  <span>⏱️ {w.duration}</span>
+                  <span>🔥 {w.intensity}</span>
+                </div>
+                <div className="flex flex-col gap-1 mb-4">
+                  {w.exercises.map((ex, i) => (
+                    <div key={i} className="flex items-center gap-2" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                      <span style={{ color: '#FACC15', fontSize: '0.65rem' }}>•</span> {ex}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {user?.role === 'admin' && (
+                <div className="flex gap-2 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  <button className="btn-primary" style={{ flex: 1, justifyContent: 'center', padding: '6px 10px', fontSize: '0.75rem' }} onClick={() => handleOpenAssign(undefined, w.id)}>
+                    Assign to Member
+                  </button>
+                  <button className="btn-danger" style={{ padding: '6px' }} onClick={() => deleteSavedWorkout(w.id)} title="Delete Workout">
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -311,12 +412,68 @@ export default function WorkoutSchedules() {
         </div>
       )}
 
+      {/* ===== CREATE WORKOUT MODAL ===== */}
+      {showCreateModal && (
+        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'white' }}>🏋️ Create New Custom Workout</h2>
+              <button onClick={() => setShowCreateModal(false)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '6px', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ height: '3px', background: 'linear-gradient(90deg, #FACC15, #FDE047)', borderRadius: '2px', marginBottom: '20px' }} />
+
+            <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4">
+              <div>
+                <label className="section-label">Workout Name</label>
+                <input className="input-glass w-full" value={createName} onChange={e => setCreateName(e.target.value)} placeholder="e.g. Upper Body Power" required />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="section-label">Focus / Muscle Group</label>
+                  <input className="input-glass w-full" value={createFocus} onChange={e => setCreateFocus(e.target.value)} placeholder="e.g. Upper Body" required />
+                </div>
+                <div>
+                  <label className="section-label">Duration</label>
+                  <input className="input-glass w-full" value={createDuration} onChange={e => setCreateDuration(e.target.value)} placeholder="45 min" required />
+                </div>
+              </div>
+              <div>
+                <label className="section-label">Intensity</label>
+                <select className="input-glass w-full" value={createIntensity} onChange={e => setCreateIntensity(e.target.value)}>
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Very High">Very High</option>
+                </select>
+              </div>
+              <div>
+                <label className="section-label">Exercises (One per line)</label>
+                <textarea
+                  className="input-glass w-full"
+                  value={createExercises}
+                  onChange={e => setCreateExercises(e.target.value)}
+                  placeholder="Bench Press 4x10&#10;Incline DB Press 3x12&#10;Cable Flyes 3x15"
+                  rows={5}
+                  required
+                />
+              </div>
+
+              <button className="btn-primary w-full justify-center" type="submit">
+                Save & Add to Library
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ===== ASSIGN WORKOUT MODAL ===== */}
       {showAssignModal && (
         <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'white' }}>📋 Assign Workout to Client</h2>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'white' }}>📋 Assign Workout to Member</h2>
               <button onClick={() => setShowAssignModal(false)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '6px', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <X size={16} />
               </button>
@@ -336,17 +493,53 @@ export default function WorkoutSchedules() {
                   )}
                 </select>
               </div>
+
               <div>
-                <label className="section-label">Select Training Day</label>
-                <select className="input-glass w-full" value={selectedDay} onChange={e => setSelectedDay(e.target.value)}>
-                  {schedules.map(s => (
-                    <option key={s.day} value={s.day}>{s.day} - {s.focus}</option>
-                  ))}
-                </select>
+                <label className="section-label">Workout Type</label>
+                <div className="flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setAssignSource('schedule')}
+                    style={{
+                      flex: 1, padding: '8px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700,
+                      background: assignSource === 'schedule' ? 'rgba(250,204,21,0.15)' : '#1A1A1A',
+                      color: assignSource === 'schedule' ? '#FACC15' : 'var(--text-muted)',
+                      border: assignSource === 'schedule' ? '1px solid rgba(250,204,21,0.3)' : '1px solid rgba(255,255,255,0.06)'
+                    }}
+                  >
+                    Weekly Schedule Day
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAssignSource('saved')}
+                    style={{
+                      flex: 1, padding: '8px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700,
+                      background: assignSource === 'saved' ? 'rgba(250,204,21,0.15)' : '#1A1A1A',
+                      color: assignSource === 'saved' ? '#FACC15' : 'var(--text-muted)',
+                      border: assignSource === 'saved' ? '1px solid rgba(250,204,21,0.3)' : '1px solid rgba(255,255,255,0.06)'
+                    }}
+                  >
+                    Custom Workout
+                  </button>
+                </div>
+
+                {assignSource === 'schedule' ? (
+                  <select className="input-glass w-full" value={selectedDay} onChange={e => setSelectedDay(e.target.value)}>
+                    {schedules.map(s => (
+                      <option key={s.day} value={s.day}>{s.day} - {s.focus}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <select className="input-glass w-full" value={selectedSavedId} onChange={e => setSelectedSavedId(Number(e.target.value))}>
+                    {savedWorkouts.map(w => (
+                      <option key={w.id} value={w.id}>{w.name} ({w.focus})</option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <button className="btn-primary w-full justify-center" type="submit" disabled={clients.length === 0}>
-                Assign Program
+                Assign Workout Program
               </button>
             </form>
           </div>

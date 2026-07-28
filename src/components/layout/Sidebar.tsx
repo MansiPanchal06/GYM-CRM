@@ -3,16 +3,18 @@ import { useAuth } from '../../context/AuthContext'
 import { useData } from '../../context/DataContext'
 import {
   LayoutDashboard, Users, Calendar, Activity, Weight,
-  Dumbbell, LogOut, ChevronRight, User, Flame, X
+  Dumbbell, LogOut, ChevronRight, User, Flame, X, PieChart
 } from 'lucide-react'
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
   { label: 'Clients', icon: Users, path: '/clients' },
   { label: 'Workout Schedules', icon: Calendar, path: '/workouts' },
+  { label: 'Member Activity', icon: Activity, path: '/member-activity' },
   { label: 'Daily Updates', icon: Activity, path: '/daily-updates' },
   { label: 'Weight Management', icon: Weight, path: '/weight' },
   { label: 'Member Portal', icon: User, path: '/member' },
+  { label: 'Member Dashboard', icon: PieChart, path: '/member-dashboard' },
 ]
 
 interface SidebarProps {
@@ -101,7 +103,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         }}>
           Main Menu
         </div>
-        {navItems.filter(item => user?.role === 'admin' || ['Member Portal', 'Workout Schedules', 'Weight Management', 'Daily Updates'].includes(item.label)).map((item) => {
+        {navItems.filter(item => user?.role === 'admin' || ['Member Dashboard', 'Member Portal', 'Workout Schedules', 'Weight Management', 'Daily Updates'].includes(item.label)).map((item) => {
           const Icon = item.icon
           const isActive = location.pathname === item.path
           return (
