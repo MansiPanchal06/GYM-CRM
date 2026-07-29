@@ -1,9 +1,22 @@
 import express from 'express';
 import cors from 'cors';
-import { initDB, dbAll, dbRun, dbGet } from './database.js';
+import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+import { 
+  Client, 
+  DailyUpdate, 
+  WeightHistory, 
+  WeightTableData, 
+  Notification, 
+  ChatMessage 
+} from './models.js';
+
+// Load environment variables from .env file
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/gym-crm';
 
 // CORS - allow all origins (you can restrict to your Vercel domain later)
 app.use(cors({
@@ -16,10 +29,10 @@ app.use(express.json());
 // Initialize the database then start server
 const startServer = async () => {
   try {
-    await initDB();
-    console.log('Database initialized successfully');
+    await mongoose.connect(MONGODB_URI);
+    console.log('Connected to MongoDB successfully');
   } catch (err) {
-    console.error('Failed to initialize database', err);
+    console.error('Failed to connect to MongoDB', err);
     process.exit(1);
   }
 
@@ -29,157 +42,151 @@ const startServer = async () => {
   });
 
   // --- Clients Endpoints ---
-  app.get('/api/clients', (req, res) => {
+  app.get('/api/clients', async (req, res) => {
     try {
-      const clients = dbAll('SELECT * FROM clients');
+      const clients = await Client.find({});
       res.json(clients);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.post('/api/clients', (req, res) => {
-    const { name, age, phone, email, avatar, avatarColor, plan, startDate, endDate, remainingDays, currentWeight, goalWeight, height, status, goal, attendance } = req.body;
+  app.post('/api/clients', async (req, res) => {
     try {
-      const result = dbRun(
-        `INSERT INTO clients (name, age, phone, email, avatar, avatarColor, plan, startDate, endDate, remainingDays, currentWeight, goalWeight, height, status, goal, attendance) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [name, age, phone, email, avatar, avatarColor, plan, startDate, endDate, remainingDays, currentWeight, goalWeight, height, status, goal, attendance || 0]
-      );
-      const newClient = dbGet('SELECT * FROM clients WHERE id = ?', [result.id]);
-      res.status(201).json(newClient);
+      const newClient = new Client(req.body);
+      const savedClient = await newClient.save();
+      res.status(201).json(savedClient);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.put('/api/clients/:id', (req, res) => {
+  app.put('/api/clients/:id', async (req, res) => {
     const { id } = req.params;
-    const data = req.body;
-    const fields = Object.keys(data).map(key => `${key} = ?`).join(', ');
-    const values = Object.values(data);
     try {
-      dbRun(`UPDATE clients SET ${fields} WHERE id = ?`, [...values, id]);
-      const updatedClient = dbGet('SELECT * FROM clients WHERE id = ?', [id]);
+      const updatedClient = await Client.findByIdAndUpdate(id, req.body, { new: true });
+      if (!updatedClient) {
+        return res.status(404).json({ error: 'Client not found' });
+      }
       res.json(updatedClient);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.delete('/api/clients/:id', (req, res) => {
+  app.delete('/api/clients/:id', async (req, res) => {
     const { id } = req.params;
     try {
-      dbRun('DELETE FROM clients WHERE id = ?', [id]);
-      res.json({ message: 'Client deleted successfully', id: parseInt(id) });
+      await Client.findByIdAndDelete(id);
+      res.json({ message: 'Client deleted successfully', id });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
   // --- Daily Updates Endpoints ---
-  app.get('/api/daily-updates', (req, res) => {
+  app.get('/api/daily-updates', async (req, res) => {
     try {
-      const updates = dbAll('SELECT * FROM daily_updates ORDER BY id DESC');
-      const formattedUpdates = updates.map(u => ({ ...u, workout: !!u.workout }));
-      res.json(formattedUpdates);
+      const updates = await DailyUpdate.find({}).sort({ _id: -1 });
+      res.json(updates);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.post('/api/daily-updates', (req, res) => {
-    const { clientId, name, avatar, avatarColor, date, workout, workoutName, water, calories, sleep, steps, mood, notes, heartRate } = req.body;
+  app.post('/api/daily-updates', async (req, res) => {
     try {
-      const result = dbRun(
-        `INSERT INTO daily_updates (clientId, name, avatar, avatarColor, date, workout, workoutName, water, calories, sleep, steps, mood, notes, heartRate)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [clientId, name, avatar, avatarColor, date, workout ? 1 : 0, workoutName, water, calories, sleep, steps, mood, notes, heartRate]
-      );
-      const newUpdate = dbGet('SELECT * FROM daily_updates WHERE id = ?', [result.id]);
-      res.status(201).json({ ...newUpdate, workout: !!newUpdate.workout });
+      const newUpdate = new DailyUpdate(req.body);
+      const savedUpdate = await newUpdate.save();
+      res.status(201).json(savedUpdate);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
   // --- Weight History Endpoints ---
-  app.get('/api/weight-history', (req, res) => {
+  app.get('/api/weight-history', async (req, res) => {
     try {
-      const history = dbAll('SELECT * FROM weight_history ORDER BY id ASC');
+      const history = await WeightHistory.find({}).sort({ _id: 1 });
       res.json(history);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.post('/api/weight-history', (req, res) => {
-    const { date, weight } = req.body;
+  app.post('/api/weight-history', async (req, res) => {
     try {
-      const result = dbRun('INSERT INTO weight_history (date, weight) VALUES (?, ?)', [date, weight]);
-      const newEntry = dbGet('SELECT * FROM weight_history WHERE id = ?', [result.id]);
-      res.status(201).json(newEntry);
+      const newEntry = new WeightHistory({ date: req.body.date, weight: req.body.weight });
+      const savedEntry = await newEntry.save();
+      res.status(201).json(savedEntry);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
   // --- Weight Table Data Endpoints ---
-  app.get('/api/weight-table-data', (req, res) => {
+  app.get('/api/weight-table-data', async (req, res) => {
     try {
-      const data = dbAll('SELECT * FROM weight_table_data ORDER BY id DESC');
+      const data = await WeightTableData.find({}).sort({ _id: -1 });
       res.json(data);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.post('/api/weight-table-data', (req, res) => {
-    const { date, weight, change, bmi } = req.body;
+  app.post('/api/weight-table-data', async (req, res) => {
     try {
-      const result = dbRun('INSERT INTO weight_table_data (date, weight, change, bmi) VALUES (?, ?, ?, ?)', [date, weight, change, bmi]);
-      const newEntry = dbGet('SELECT * FROM weight_table_data WHERE id = ?', [result.id]);
-      res.status(201).json(newEntry);
+      const newEntry = new WeightTableData({
+        date: req.body.date,
+        weight: req.body.weight,
+        change: req.body.change,
+        bmi: req.body.bmi
+      });
+      const savedEntry = await newEntry.save();
+      res.status(201).json(savedEntry);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
   // --- Notifications Endpoints ---
-  app.get('/api/notifications', (req, res) => {
+  app.get('/api/notifications', async (req, res) => {
     try {
-      const notifs = dbAll('SELECT * FROM notifications ORDER BY id DESC');
-      const formatted = notifs.map(n => ({ ...n, read: !!n.read }));
-      res.json(formatted);
+      const notifs = await Notification.find({}).sort({ _id: -1 });
+      res.json(notifs);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.post('/api/notifications', (req, res) => {
-    const { message, time, type } = req.body;
+  app.post('/api/notifications', async (req, res) => {
     try {
-      const result = dbRun('INSERT INTO notifications (message, time, read, type) VALUES (?, ?, ?, ?)', [message, time || 'Just now', 0, type || 'info']);
-      const newNotif = dbGet('SELECT * FROM notifications WHERE id = ?', [result.id]);
-      res.status(201).json({ ...newNotif, read: false });
+      const newNotif = new Notification({
+        message: req.body.message,
+        time: req.body.time || 'Just now',
+        read: false,
+        type: req.body.type || 'info'
+      });
+      const savedNotif = await newNotif.save();
+      res.status(201).json(savedNotif);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.put('/api/notifications/:id/read', (req, res) => {
+  app.put('/api/notifications/:id/read', async (req, res) => {
     const { id } = req.params;
     try {
-      dbRun('UPDATE notifications SET read = 1 WHERE id = ?', [id]);
+      await Notification.findByIdAndUpdate(id, { read: true });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.put('/api/notifications/read-all', (req, res) => {
+  app.put('/api/notifications/read-all', async (req, res) => {
     try {
-      dbRun('UPDATE notifications SET read = 1');
+      await Notification.updateMany({}, { read: true });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -187,24 +194,26 @@ const startServer = async () => {
   });
 
   // --- Chat Messages Endpoints ---
-  app.get('/api/chat-messages', (req, res) => {
+  app.get('/api/chat-messages', async (req, res) => {
     try {
-      const messages = dbAll('SELECT * FROM chat_messages ORDER BY id ASC');
+      const messages = await ChatMessage.find({}).sort({ _id: 1 });
       res.json(messages);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.post('/api/chat-messages', (req, res) => {
-    const { text, sender, senderName, timestamp, time } = req.body;
+  app.post('/api/chat-messages', async (req, res) => {
     try {
-      const result = dbRun(
-        'INSERT INTO chat_messages (text, sender, senderName, timestamp, time) VALUES (?, ?, ?, ?, ?)',
-        [text, sender, senderName, timestamp, time]
-      );
-      const newMsg = dbGet('SELECT * FROM chat_messages WHERE id = ?', [result.id]);
-      res.status(201).json(newMsg);
+      const newMsg = new ChatMessage({
+        text: req.body.text,
+        sender: req.body.sender,
+        senderName: req.body.senderName,
+        timestamp: req.body.timestamp,
+        time: req.body.time
+      });
+      const savedMsg = await newMsg.save();
+      res.status(201).json(savedMsg);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
